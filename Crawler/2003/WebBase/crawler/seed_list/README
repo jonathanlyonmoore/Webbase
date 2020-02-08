@@ -1,0 +1,13 @@
+order:
+
+extract-hosts.pl
+merge-entries.pl
+resolve.pl
+merge-aliases.pl
+prune-aliases.pl
+load-aliases.pl # change db info
+
+
+cat input | perl extract-hosts.pl | merge-entries.pl | perl resolve.pl | perl merge-aliases.pl | perl prune-aliases.pl > table.sql
+cat table.sql | perl load-aliases.pl (appropriately edited)
+

@@ -1,0 +1,6 @@
+String together the inputs and outputs in the following order (save the intermediate data):
+
+extract-hosts handler in RunHandlers
+merge-entries.pl
+resolve.pl
+load-aliases-raw.pl # change db info

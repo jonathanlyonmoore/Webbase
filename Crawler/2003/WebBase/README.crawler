@@ -1,0 +1,64 @@
+
+README.crawler
+Crawler quickstart and README pointers
+Wang Lam <wlam@cs.stanford.edu> 31 Jan 2002
+	23 Mar 2002 - added optional Web-based monitoring portion <wlam>
+	08 Aug 2002 - switched from siteserver to crawl_ctl.pl <wlam>
+	06 Nov 2002 - added spam warning; make->gmake <wlam>
+	20 May 2003 - added more comments; mention seed_list/ <wlam>
+
+For more information on this portion, see crawler/README:
+
+1  Edit the HTTP/1.0 headers in crawler/crawl_server/fetch.cc:345 so inquiries
+   and complaints go to the correct email address (the address of the crawler 
+   operator).  A minor warning:  The email address we specify, and use 
+   exclusively for the crawler, attracted spam; apparently somebody scans 
+   crawl logs for addresses to spam.
+
+   The crawler is called Pita; please keep the name consistent across all code,
+   especially between the robots.txt parser and the HTTP headers.
+
+2  In this (WebBase/) directory, './configure' and 'gmake crawler'.
+
+For more information on this portion, see crawler/crawl_binaries/README,
+starting at "Instructions to run the crawler":
+
+3  chdir crawler/crawl_binaries/
+
+4  Edit crawl_config (which indicates the number of sites each crawler
+   should crawl concurrently) and dir.config.* (which tells each crawler
+   process where to write its output).
+
+5  mkdir log/ (if it doesn't already exist)
+
+There is no bundled information for this portion:
+
+6  Load a database with Web sites to crawl, and edit crawl_config
+   to point to the database.  See crawl_table_setup.sql for information
+   about the database tables that crawl_buddy.pl expects, and the contents
+   of ../../crawler/seed_list/ for an example of how data for the database
+   might be generated and loaded using (high-nameserver-load) DNS queries.
+
+7  Use crawl_ctl.pl to start each Web crawler with a unique nonnegative ID.
+   $ ./crawl_ctl.pl start 0
+   $ ./crawl_ctl.pl start 1
+   :
+
+   Run crawl_ctl.pl without arguments to see its options:
+   $ ./crawl_ctl.pl 
+   Usage: crawl_ctl.pl { {new|start} | suspend | continue . . .
+
+There is no bundled information for this portion, which is optional:
+
+8  Configure a PHP4-enabled Web server to run WebBase/web-scripts/crawl*.php.
+   crawl{stat,cmd,log,lib}.php can be relocated, but must remain in the same 
+   path as each other.
+
+9  Edit the default directory specified in crawlstat.php:14 to point
+   to the path WebBase/crawler/crawl_binaries/ in step 3.
+
+10 Point a Web browser to the Web server of step 7, so that the server executes
+   WebBase/web-scripts/crawlstat.php.  (For example, if crawl*.php were copied
+   into the Web server's document root, get "http://crawlserver/crawlstat".)
+   This Web resource provides basic Web crawler monitoring.
+

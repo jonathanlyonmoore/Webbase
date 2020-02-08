@@ -1,0 +1,4 @@
+mysql webbase -p -e 'create table OffsetLookup ( DocID BIGINT UNSIGNED PRIMARY KEY NOT NULL , Offset BIGINT UNSIGNED NOT NULL ) ;'
+mysql webbase -p -e 'create table URLLookup ( DocID BIGINT UNSIGNED PRIMARY KEY NOT NULL , URL BLOB NOT NULL ) ;'
+mysql webbase -p -e 'create table ForwardLinkOffsets ( DocID BIGINT UNSIGNED PRIMARY KEY NOT NULL , FileID TINYINT UNSIGNED NOT NULL , FileOffset INTEGER UNSIGNED NOT NULL ) ; '
+mysql webbase -p -e 'create table BackwardLinkOffsets ( DocID BIGINT UNSIGNED PRIMARY KEY NOT NULL , FileID TINYINT UNSIGNED NOT NULL , FileOffset INTEGER UNSIGNED NOT NULL ) ; '

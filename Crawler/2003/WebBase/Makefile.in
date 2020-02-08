@@ -1,0 +1,661 @@
+#
+#
+# Makefile for WebBase code
+# Wang Lam <wlam@cs.stanford.edu>
+# May 2001
+# updated Aug 2002 to accomodate autoconf
+#
+# @configure_input@
+#
+
+##
+## Makefile setup (user-configurable section)
+##
+
+## Directories
+
+BIN = bin
+	# Binaries end up here
+OBJ = obj-$(shell $(CXX) -dumpversion)
+	# Red Hat Linux 7 defaults to a screwy g++,
+	# so we isolate its object files to prevent
+	# link errors when moving between different versions of GNU/Linux.
+
+# SUBDIRS = $(shell find . -type d \! -name '*CVS*')
+	# (Too expansive)
+SUBDIRS = feeders handlers hashlookup postgresql text-index urlHash utils\
+	feeders/repository_access handlers/utils port crawler/crawl_server\
+	utils/unit-tests feeders/repository_access/unit-tests feeders/jni
+	# Currently ignored list: archiver webbase webcat
+
+LIBWWW = -lwwwcore -lwwwutils
+INCLWWW = -I/usr/include/w3c-libwww -I/usr/local/include -I/usr/local/include/w3c-libwww
+	# Path to libwww
+
+## Programs
+
+FIND = find
+SED = sed
+GREP = grep
+TOUCH = touch
+# CC = gcc
+# CXX = g++
+# LD = g++
+CC = @CC@
+CXX = @CXX@
+LD = @CXX@
+# We're not ready for (strict) ISO/ANSI C++.  :(
+# CC = /usr/local/apps/gcc-3.0.4/bin/gcc
+# CXX = /usr/local/apps/gcc-3.0.4/bin/g++
+# LD = /usr/local/apps/gcc-3.0.4/bin/g++
+@SET_MAKE@
+MAKEDEPEND = $(CC) -MM 
+MKDIR = mkdir -p
+# LN = ln -s -f
+LN = @LN_S@ -f
+CP = cp -f
+
+## Flags
+
+JARCH_LIB = java/arch
+# FIXME: autoconf should find these next two
+ARCH_NAME = linux
+INCJNI = -I/usr/java/j2sdk1.4.1/include/ -I/usr/java/j2sdk1.4.1/include/linux/
+
+INCLUDES = -I. -Iutils -Ifeeders/repository_access -Iport/include
+# INCLUDES = -Iutils -I/usr/include/g++-v3 -I/usr/include/g++-3
+CPPFLAGS = $(INCLUDES) -fPIC @CPPFLAGS@ @DEFS@
+CFLAGS = -g -Wall -Wno-sign-compare -O3 -pipe @CFLAGS@
+CXXFLAGS = $(CFLAGS) @CXXFLAGS@
+# We ignore autoconf's LIBS, because LIBS flattens our lib dependency info.
+LDFLAGS = -g -Wall -Wno-sign-compare -O3 @LDFLAGS@
+
+## Targets
+
+INDEXUTILS = normalize-test b2t t2b lb2t p2l\
+		blinkgen linkOffsetGenerator pairsort\
+		deltafilter cutter makeurlindex expandfilter tosigned urlHasher
+	# Targets used to build link indexes 
+TEXT_INDEX_TARGETS = indexer merger doccounter
+SECONDARY_TEXT_INDEX_TARGETS = imerger qmerger statmerge statload\
+		qserver qclient lookup dbdump iddump infodump dbindexgen repcreator\
+		statistics timertest invlistdump stresswordiddb rewritewordiddb
+
+
+CLIENT_TARGETS = RunHandlers hashlookup
+SERVER_TARGETS = distributor testfeeder $(INDEXUTILS) $(TEXT_INDEX_TARGETS)
+CRAWLER_TARGETS = crawl_server
+JNI_TARGETS = librepository libnetrepository
+# unit tests for utils that are used by both client and server
+UTILS_TARGETS = type_detector path_generator repository_write_test htmlparser-test
+# crawl_ctl.pl crawl_buddy.pl
+ALL_TARGETS = $(CLIENT_TARGETS) $(SERVER_TARGETS) $(CRAWLER_TARGETS) $(UTILS_TARGETS)
+
+
+EXCLUDES = hashlookup/hash.cc crawler/crawl_server/crc64.c \
+	postgresql/dbfetch.c postgresql/webbase_url_sort.c \
+	feeders/repository_access/bigfile.cc
+	# Files to *not* automatically do $(MAKEDEPEND) on;
+	# usually indicates the file is not in use or handled elsewhere.
+	# Tip:
+	# To expand wildcards in gmake: $(wildcard dir/wild*pattern.cc)
+	#
+	# (This is a hack for an automated make depends; appending
+	# MAKEDEPEND with 2>/dev/null may also suffice.)
+
+##
+## Makefile build process / general rules
+##
+
+# Unless you like to hack GNU makefiles, you may prefer to skip 
+# this section if possible, and go to the next section to
+# add or customize individual build rules.
+
+.PHONY: all any clean find help depend depends softlinks crawler
+
+ALL_TARGET_BINS = $(addprefix $(BIN)/,$(ALL_TARGETS))
+CLIENT_TARGET_BINS = $(addprefix $(BIN)/,$(CLIENT_TARGETS))
+SERVER_TARGET_BINS = $(addprefix $(BIN)/,$(SERVER_TARGETS))
+CRAWLER_TARGET_BINS = $(addprefix $(BIN)/,$(CRAWLER_TARGETS))
+UTILS_TARGET_BINS = $(addprefix $(BIN)/,$(UTILS_TARGETS))
+JNI_TARGET_BINS = $(addsuffix .so, $(addprefix $(JARCH_LIB)/$(ARCH_NAME)/,$(JNI_TARGETS)))
+help:
+	@echo ''
+	@echo 'Makefile: build WebBase executables'
+	@echo ''
+	@echo 'Command targets:'
+	@echo '   client             make client executables to access WebBase'
+	@echo '   server             make server and index-making executables'
+	@echo '   crawler            make Web crawler'
+	@echo '   utils              make unit tests for utils'
+	@echo '   jni                make jni library for feeders'
+	@echo '   all                make all executables'
+	@echo '   clean              delete executables, object files, ruleset'
+	@echo '   depends            rebuild dependency info (Makefile.depends)'
+	@echo '   help               display this message (default target)'
+	@echo '   find KEY=foo       retrieve make rule for target foo'
+	@echo ''
+	@echo 'Typical binary targets:'
+	@echo '   RunHandlers        alias for bin/RunHandlers'
+	@echo '   runhandlers        alias for bin/RunHandlers'
+	@echo '   distributor        alias for bin/distributor'
+	@echo ''
+#	@echo 'All binary targets:'
+#	@echo '$(ALL_TARGETS)'
+#	@echo ''
+# $(ALL_TARGETS) expands into too much clutter.
+
+# setup: Makefile.rules Makefile.depends $(OBJ) $(BIN)
+# Required targets for any build activity, now folded in elsewhere.
+# (as opposed to make help or make find)
+
+all: $(ALL_TARGET_BINS) 
+client: $(CLIENT_TARGET_BINS)
+server: $(SERVER_TARGET_BINS)
+utils: $(UTILS_TARGET_BINS)
+jni: $(JNI_TARGET_BINS)
+
+# This is a brain-dead make crawler, but it's fine if you build rarely.
+# If you are touching crawler source, use crawler/*/Makefile directly.
+# crawler:
+crawler: ${CRAWLER_TARGET_BINS}
+	$(CP) $(BIN)/crawl_server crawler/crawl_binaries/
+	$(CP) crawler/crawl_server/crawl_ctl.pl crawler/crawl_binaries/
+	$(CP) crawler/crawl_server/crawl_buddy.pl crawler/crawl_binaries/
+	$(CP) crawler/crawl_server/crawl_unroll.pl crawler/crawl_binaries/
+	$(CP) crawler/crawl_server/crawl_roll.pl crawler/crawl_binaries/
+#	-$(MKDIR) crawler/crawl_server/linux.st
+#	cd crawler/crawl_server && $(MAKE) 
+#	$(CP) crawler/crawl_server/linux.st/crawl_server crawler/crawl_binaries/
+#
+#	-$(CP) crawler/crawl_server/linux.st/statcrawler crawler/crawl_binaries/
+#	@echo "Please ignore warnings for $(MAKE) siteserver:"
+#	cd crawler/site_server && $(MAKE) siteserver dnsdbserver starter
+#	$(CP) crawler/site_server/siteserver crawler/crawl_binaries/
+#	$(CP) crawler/site_server/dnsdbserver crawler/crawl_binaries/
+#	$(CP) crawler/site_server/starter crawler/crawl_binaries/
+
+$(OBJ):
+	$(MKDIR) $(OBJ)
+$(BIN):
+	$(MKDIR) $(BIN)
+
+KEY = none
+find:
+	@$(MAKE) -p | $(GREP) $(KEY):
+
+clean:
+	-$(RM) $(ALL_TARGET_BINS) $(addprefix $(BIN)/, $(SECONDARY_TEXT_INDEX_TARGETS))
+	-$(RM) $(OBJ)/*.o
+	-$(RM) Makefile.rules
+	-$(RM) Makefile.depends
+	-$(RM) config.cache config.log config.status
+#	-cd crawler/crawl_server && $(MAKE) clean
+#	-cd crawler/site_server && $(MAKE) clean
+
+
+# softlinks
+ifdef NEVER_REMAKE_RULES
+Makefile.rules:
+else
+Makefile.rules: Makefile $(OBJ) $(BIN)
+endif
+	@echo Creating Makefile.rules for this build...
+	@$(RM) $@
+	@$(TOUCH) $@
+	@echo '#' >> $@
+	@echo '#' >> $@
+	@echo '# Makefile.rules' >> $@
+	@echo '# automatically-generated ruleset for WebBase' >> $@
+	@echo '# Wang Lam <wlam@cs.stanford.edu>' >> $@
+	@echo '#' >> $@
+	@echo '# Generated from Makefile target Makefile.rules.' >> $@
+	@echo '# Customize your build process by editing the Makefile section,' >> $@
+	@echo '# Makefile compile customization, so that your customizations' >> $@
+	@echo '# are preserved across invocations of gmake.' >> $@
+	@echo '#' >> $@
+	@echo '#' >> $@
+	@echo '' >> $@
+	@echo '.PHONY: runhandlers $(ALL_TARGETS)' >> $@
+	@echo 'runhandlers: RunHandlers' >> $@
+	@$(foreach T,$(ALL_TARGETS),\
+		echo '$T: $$(BIN)/$T' >> $@; \
+	)
+	@echo '' >> $@
+	@$(foreach DIR,$(SUBDIRS),\
+		echo '$$(OBJ)/%.o: $(DIR)/%.c' >> $@; \
+		echo '	$$(CC) -c $$(CPPFLAGS) -o $$@ $$^ -I$(DIR) $$(CFLAGS) $$($(DIR)_CFLAGS) $$($$*_CFLAGS)' >> $@; \
+		echo '$$(OBJ)/%.o: $(DIR)/%.cc' >> $@; \
+		echo '	$$(CXX) -c $$(CPPFLAGS) -o $$@ $$^ -I$(DIR) $$(CXXFLAGS) $$($(DIR)_CXXFLAGS) $$($$*_CXXFLAGS)' >> $@; \
+		echo '' >> $@; \
+	)
+	@echo "Makefile.rules ready; restarting Makefile."
+
+include Makefile.rules
+
+# What did Makefile.rules do?  It assembles rules of the form:
+#
+# $(OBJ)/%.o: handlers/%.cc
+#	$(CXX) -c $(CPPFLAGS) -o $@ $^ -Ihandlers $(CXXFLAGS) <special flags>
+#
+# for each directory of interest: feeders, handlers, hashlookup, and so on.
+# <special flags> let you customize any rule without rewriting it.
+# Simply define
+#
+# directory_CXXFLAGS=-Imagic -Wspecial-warning --custom-switch
+# file_CXXFLAGS=-Imagic --custom-switch
+#
+# to append switches to every compile from directory/, and
+# to append switches to a build of a particular object file.o,
+# respectively.
+#
+# Repeat for C instead of C++ (CFLAGS instead of CXXFLAGS).
+#
+# As an added bonus, Makefile.rules also creates phony targets of the form:
+#
+# .PHONY: binary
+# binary: $(BIN)/binary
+#
+# for each target in $(ALL_TARGETS), so that one can type the more intuitive 
+# 'make binary' instead of 'make bin/binary'.
+
+$(BIN)/%: $(OBJ)/%.o
+	$(LD) $(LDFLAGS) -o $@ $^ $($*_LDFLAGS)
+
+depend:
+	-$(RM) Makefile.depends
+	@$(MAKE) Makefile.depends
+depends:
+	-$(RM) Makefile.depends
+	@$(MAKE) Makefile.depends
+Makefile.depends: Makefile
+	@echo Creating Makefile.depends for this build...
+	@$(RM) $@
+	@$(TOUCH) $@
+	@echo '#' >> $@
+	@echo '#' >> $@
+	@echo '# Makefile.depends' >> $@
+	@echo '# automatically-generated dependency lists for WebBase' >> $@
+	@echo '# Wang Lam <wlam@cs.stanford.edu>' >> $@
+	@echo '#' >> $@
+	@echo '# Generated from Makefile target Makefile.depends.' >> $@
+	@echo '# Customize your build process by editing the Makefile section,' >> $@
+	@echo '# Makefile compile customization, so that your customizations' >> $@
+	@echo '# are preserved across invocations of gmake.' >> $@
+	@echo '#' >> $@
+	@echo '#' >> $@
+	@echo '' >> $@
+	@$(foreach DIR,$(SUBDIRS), \
+		$(foreach FILE,$(filter-out $(EXCLUDES),$(wildcard $(DIR)/*.cc)),\
+			$(MAKEDEPEND) $(CPPFLAGS) -I$(DIR) $(CXXFLAGS) $($(DIR)_CXXFLAGS) $($(basename $(notdir $(FILE)))_CXXFLAGS) $(FILE) >> $@ ; \
+		) \
+	)
+	@$(foreach DIR,$(SUBDIRS), \
+		$(foreach FILE,$(filter-out $(EXCLUDES),$(wildcard $(DIR)/*.c)),\
+			$(MAKEDEPEND) $(CPPFLAGS) -I$(DIR) $(CFLAGS) $($(DIR)_CFLAGS) $($(basename $(notdir $(FILE)))_CFLAGS) $(FILE) >> $@ ; \
+		) \
+	)
+	@echo "Makefile.depends ready; restarting Makefile."
+
+include Makefile.depends
+ 
+# What did the Makefile.depends target do?
+#
+# It invoked MAKEDEPEND (usually gcc -MM or makedepend) on 
+# all source files of the set {$(SUBDIRS)}/*.{c,cc} (except those
+# matching a filename entry in EXCLUDES), and saved the result
+# into a file Makefile.depends so that Makefile has reasonable
+# dependency information.
+#
+# In lieu of EXCLUDES, one can also say MAKEDEPEND = ... 2>/dev/null,
+# but this means notice of valid errors will be deferred until
+# compile-time.
+
+##
+## Makefile softlink reconstruction
+##
+
+# Because cvs does not check in and out softlinks, we must use this hack
+# to rebuild softlinks on demand.
+
+softlinks: text-index/db-4.0.14/lib/libdb-4.so text-index/db-4.0.14/lib/libdb.so text-index/db-4.0.14/lib/libdb_cxx-4.so text-index/db-4.0.14/lib/libdb_cxx.so text-index/db-4.0.14/lib/libdb.a text-index/db-4.0.14/lib/libdb_cxx.a
+
+text-index/db-4.0.14/lib/libdb-4.so: text-index/db-4.0.14/lib/libdb-4.0.so
+	(cd text-index/db-4.0.14/lib/ && $(LN) libdb-4.0.so libdb-4.so)
+
+text-index/db-4.0.14/lib/libdb.so: text-index/db-4.0.14/lib/libdb-4.0.so
+	(cd text-index/db-4.0.14/lib/ && $(LN) libdb-4.0.so libdb.so)
+
+text-index/db-4.0.14/lib/libdb_cxx-4.so: text-index/db-4.0.14/lib/libdb_cxx-4.0.so
+	(cd text-index/db-4.0.14/lib/ && $(LN) libdb_cxx-4.0.so libdb_cxx-4.so)
+
+text-index/db-4.0.14/lib/libdb_cxx.so: text-index/db-4.0.14/lib/libdb_cxx-4.0.so
+	(cd text-index/db-4.0.14/lib/ && $(LN) libdb_cxx-4.0.so libdb_cxx.so)
+
+text-index/db-4.0.14/lib/libdb.a: text-index/db-4.0.14/lib/libdb-4.0.a
+	(cd text-index/db-4.0.14/lib/ && $(LN) libdb-4.0.a libdb.a)
+
+text-index/db-4.0.14/lib/libdb_cxx.a: text-index/db-4.0.14/lib/libdb_cxx-4.0.a
+	(cd text-index/db-4.0.14/lib/ && $(LN) libdb_cxx-4.0.a libdb_cxx.a)
+
+##
+## Makefile compile customization
+##
+
+## Special directory flags
+
+# These directories have special directory or dependency structure,
+# so need some extra flags.
+
+# text-index:
+text-index_CXXFLAGS	= -D_REENTRANT -Itext-index/include \
+		-Itext-index/db/include -Ifeeders \
+		-Ifeeders/repository_access -IurlHash
+feeders_CXXFLAGS	= -D_REENTRANT 
+handlers_CXXFLAGS	= -D_REENTRANT 
+
+# crawler:
+crawler/crawl_server_CXXFLAGS	= -Ifeeders/repository_access \
+					-DSOCKET_CONTROL -D_REENTRANT
+
+# jni stuff for feeders
+feeders/jni_CXXFLAGS = $(INCJNI) -Ifeeders
+feeders/jni_LDFLAGS = -shared -lz
+
+librepository.so_LDFLAGS = -Wl,-h,librepository.so 
+libnetrepository.so_LDFLAGS = -Wl,-h,libnetrepository.so 
+
+## Special object compile flags
+
+# These particular targets require some extra compile flags.
+
+# Feeders
+WebCatFeeder_CXXFLAGS	= -Ifeeders/repository_access
+TestFeeder_CXXFLAGS	= -Ifeeders/repository_access
+NetworkFeeder_CXXFLAGS	= -IurlHash
+
+# Handlers -target-
+linkparser_CXXFLAGS	= $(INCLWWW)
+offset-handler_CXXFLAGS	= -IurlHash 
+# Requires urlHash
+pagelength-handler_CXXFLAGS = -IurlHash
+wordstats-handler_CXXFLAGS = -IurlHash
+
+# hashlookup (DocID->URL lookup)
+hashlookup_CXXFLAGS	= -IurlHash -Iutils
+makeurlindex_CXXFLAGS	= -IurlHash
+
+# main()
+# FIXME: Should NOT require urlHash!
+process_CXXFLAGS	= -Ifeeders -Ifeeders/repository_access -IurlHash
+normalize_CFLAGS	= $(INCLWWW)
+Distributor_CXXFLAGS	= -Ifeeders -Ifeeders/repository_access
+
+# utils
+urlHasher_CXXFLAGS	= -IurlHash
+# BEGIN SOLARIS PORT CHANGE
+my_utility_CXXFLAGS	= -D_REENTRANT
+# END SOLARIS PORT CHANGE
+pageinfo2mapping_CXXFLAGS	= -IurlHash
+
+
+
+## Custom compile rules
+
+# Distinguish between hashlookup.cc with and without an independent main().
+$(OBJ)/hashlookup-main.o: hashlookup/hashlookup.cc
+	$(CXX) -c $(CXXFLAGS) -DMAIN -o $@ $< -Iutils -IurlHash
+
+##
+## Makefile link process
+##
+
+# Sadly, link rules must still be specified by hand.
+
+## runhandlers
+
+HANDLER_OBJS = linkparser.o urlwriter.o offset-handler.o offsetwriter.o\
+	pagelength-handler.o pagelengthwriter.o html_parser.o url.o HTML2Plain.o\
+	linkswriter.o wordstats-handler.o HTTPUtil.o
+
+$(BIN)/RunHandlers: $(addprefix $(OBJ)/,Utils.o Url.o \
+   NetworkFeeder.o SiteEnumerator.o WebCatFeeder.o FileFeeder.o repository.o FSBigFile.o TypeDetector.o\
+	 FSPageContainer.o PathGenerator.o WBHeader.o HTTPUtil.o Crc32.o my_utility.o\
+   confloader.o confTable.o process.o\
+   url2hash.o urlHash.o normalize.o Crc64.o )\
+   $(addprefix $(OBJ)/,$(HANDLER_OBJS))
+	$(LD) $(LDFLAGS) -o $@ $^ $(LIBWWW) -lz @PTHREAD_LIBS@ @SOCKET_LIBS@
+	-$(RM) $(BIN)/runhandlers
+	(cd $(BIN) && $(LN) RunHandlers runhandlers)
+
+## distributor
+
+$(BIN)/distributor: $(addprefix $(OBJ)/,Distributor.o confloader.o Utils.o TUtils.o WebCatFeeder.o\
+	SiteEnumerator.o repository.o FSBigFile.o TypeDetector.o FSPageContainer.o PathGenerator.o\
+	 WBHeader.o HTTPUtil.o Crc32.o my_utility.o Url.o)
+	$(LD) $(LDFLAGS) -o $@ $^ @PTHREAD_LIBS@ -lz @SOCKET_LIBS@
+
+# feeder test client
+$(BIN)/testfeeder:  $(addprefix $(OBJ)/, TestFeeder.o NetworkFeeder.o WebCatFeeder.o SiteEnumerator.o\
+	FileFeeder.o Url.o Utils.o repository.o FSBigFile.o TypeDetector.o FSPageContainer.o PathGenerator.o\
+	 WBHeader.o HTTPUtil.o Crc32.o my_utility.o)
+	$(LD) $(LDFLAGS) -o $@ $^ -lz @PTHREAD_LIBS@ @SOCKET_LIBS@
+
+## crawler
+
+$(BIN)/crawl_server: $(addprefix $(OBJ)/,url.o fetch.o manager.o \
+                  my_utility.o url_queue.o crawl_server.o \
+                  crawl_comm.o net_mod.o url_filter.o \
+                  putaside_queue.o html_parser.o \
+                  robot_parser.o \
+                  repository.o FSBigFile.o TypeDetector.o FSPageContainer.o PathGenerator.o WBHeader.o HTTPUtil.o Crc32.o callback.o readmsg.o parameter.o crawl_utility.o \
+                  @DAEMON_O@ @GETOPT_O@ )
+	$(LD) $(LDFLAGS) -o $@ $^ -lz @SOCKET_LIBS@
+
+# JNI libraries for feeders
+$(JARCH_LIB)/$(ARCH_NAME)/librepository.so: $(addprefix $(OBJ)/, webbase_feeders_RepositoryFeederImpl.o\
+	 WebCatFeeder.o SiteEnumerator.o Utils.o Url.o FSBigFile.o FSPageContainer.o repository.o my_utility.o FSPageContainer.o WBHeader.o Crc32.o PathGenerator.o TypeDetector.o HTTPUtil.o FSBigFile.o SiteEnumerator.o)
+	$(LD) $(LDFLAGS) -o $@ $^ -shared -lz -Wl,-h,librepository.so
+
+$(JARCH_LIB)/$(ARCH_NAME)/libnetrepository.so: $(addprefix $(OBJ)/, webbase_feeders_NetworkFeederImpl.o NetworkFeeder.o Utils.o Url.o repository.o my_utility.o FSPageContainer.o WBHeader.o Crc32.o PathGenerator.o TypeDetector.o HTTPUtil.o FSBigFile.o SiteEnumerator.o)
+	$(LD) $(LDFLAGS) -o $@ $^ -shared -lz -Wl,-h,libnetrepository.so
+
+## WebBase index utilities
+
+# FIXME: More utilities need to be folded into this section.
+
+# unit tests
+$(BIN)/type_detector: $(OBJ)/type_detector.o $(OBJ)/TypeDetector.o $(OBJ)/url.o
+	$(LD) $(LDFLAGS) -o $@ $^
+
+$(BIN)/path_generator: $(OBJ)/path_generator.o $(OBJ)/PathGenerator.o $(OBJ)/TypeDetector.o $(OBJ)/url.o
+	$(LD) $(LDFLAGS) -o $@ $^
+
+$(BIN)/repository_write_test: $(OBJ)/Crc32.o $(OBJ)/FSBigFile.o $(OBJ)/FSPageContainer.o $(OBJ)/HTTPUtil.o $(OBJ)/PathGenerator.o $(OBJ)/TypeDetector.o $(OBJ)/Url.o $(OBJ)/Utils.o $(OBJ)/WBHeader.o $(OBJ)/my_utility.o $(OBJ)/repository.o $(OBJ)/repository_write_test.o
+	$(LD) $(LDFLAGS) -o $@ $^ -lz @PTHREAD_LIBS@
+
+$(BIN)/htmlparser-test: $(OBJ)/html_parser.o $(OBJ)/htmlparser.o
+	$(LD) $(LDFLAGS) -o $@ $^
+
+# utilities/debugging
+$(BIN)/normalize-test: $(OBJ)/normalizer.o $(OBJ)/normalize.o
+	$(LD) $(LDFLAGS) -o $@ $^ $(LIBWWW)
+$(BIN)/hash: $(OBJ)/hash.o $(OBJ)/urlHash.o $(OBJ)/normalize.o $(OBJ)/Crc64.o
+	$(LD) $(LDFLAGS) -o $@ $^ $(LIBWWW)
+$(BIN)/neg: $(OBJ)/neg.o
+$(BIN)/urlHasher: $(OBJ)/urlHasher.o $(OBJ)/url2hash.o $(OBJ)/urlHash.o $(OBJ)/normalize.o $(OBJ)/Crc64.o
+	$(LD) $(LDFLAGS) -o $@ $^ $(LIBWWW)
+
+# link index generation
+$(BIN)/b2t: $(OBJ)/bin2text.o
+	$(LD) $(LDFLAGS) -o $@ $^
+$(BIN)/t2b: $(OBJ)/text2bin.o
+	$(LD) $(LDFLAGS) -o $@ $^
+$(BIN)/lb2t: $(OBJ)/linkBin2Text.o
+	$(LD) $(LDFLAGS) -o $@ $^
+$(BIN)/p2l: $(OBJ)/listconvert.o
+	$(LD) $(LDFLAGS) -o $@ $^
+$(BIN)/tosigned: $(OBJ)/tosigned.o
+	$(LD) $(LDFLAGS) -o $@ $^
+
+$(BIN)/blinkgen: $(OBJ)/blinkgen.o
+$(BIN)/linkOffsetGenerator: $(OBJ)/linkOffsetGenerator.o
+$(BIN)/pairsort: $(OBJ)/pairsort.o
+
+# DocID->URL lookup index generation
+$(BIN)/deltafilter: $(OBJ)/minidelta.o
+	$(LD) $(LDFLAGS) -o $@ $^
+$(BIN)/cutter: $(OBJ)/cutter.o
+$(BIN)/makeurlindex: $(addprefix $(OBJ)/,makeurlindex.o url2hash.o urlHash.o normalize.o Crc64.o)
+	$(LD) $(LDFLAGS) -o $@ $^ $(LIBWWW)
+
+# DocID->URL lookup command-line binaries
+$(BIN)/expandfilter: $(OBJ)/expandfilter.o
+	$(LD) $(LDFLAGS) -o $@ $^
+$(BIN)/hashlookup: $(addprefix $(OBJ)/,hashlookup-main.o url2hash.o urlHash.o normalize.o Crc64.o)
+	$(LD) $(LDFLAGS) -o $@ $^ $(LIBWWW)
+
+# Main text-indexing binaries (these are built as part of "make all")
+$(BIN)/indexer: $(addprefix $(OBJ)/, Indexer.o MergeUtils.o DBFlusher.o WordKey.o DbUtils.o \
+		 StringFileEnumeration.o SWFilter.o Stemming.o Url.o \
+		 NetworkFeeder.o WebCatFeeder.o SiteEnumerator.o FileFeeder.o my_utility.o \
+		 repository.o FSBigFile.o TypeDetector.o FSPageContainer.o PathGenerator.o WBHeader.o HTTPUtil.o Crc32.o Utils.o TUtils.o HTML2Plain.o Compression.o @GETOPT_O@)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx @SOCKET_LIBS@
+
+$(BIN)/merger: $(addprefix $(OBJ)/, KeyMerger.o WordKey.o Compression.o DBEnumeration.o \
+																		DBFlusher.o StringFileEnumeration.o Utils.o DbUtils.o \
+																		WordIdKey.o WordInfoKey.o MergeUtils.o @GETOPT_O@)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx @SOCKET_LIBS@
+
+$(BIN)/doccounter: $(addprefix $(OBJ)/, DocCounter.o WordInfoKey.o Utils.o MergeUtils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx @SOCKET_LIBS@
+
+# Secondary text-indexing binaries that are not built as part of "make all".
+# The "tibinaries" target will build all these binaries in one shot.
+tibinaries: $(addprefix $(BIN)/, $(SECONDARY_TEXT_INDEX_TARGETS))
+
+$(BIN)/imerger: $(addprefix $(OBJ)/, IMerger.o WordKey.o Compression.o DBEnumeration.o DBFlusher.o \
+																		 StringFileEnumeration.o Utils.o DbUtils.o WordIdKey.o \
+																		 WordInfoKey.o MergeUtils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/qmerger: $(addprefix $(OBJ)/, QMerger.o WordKey.o Compression.o PostingStreamEnumeration.o \
+																		 DBFlusher.o StringFileEnumeration.o Utils.o DbUtils.o \
+																		 WordIdKey.o WordInfoKey.o MergeUtils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/statmerge: $(addprefix $(OBJ)/, StatMerge.o WordInfoKey.o Utils.o MergeUtils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/statload: $(addprefix $(OBJ)/, StatLoad.o WordInfoKey.o Utils.o MergeUtils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+#$(BIN)/search: $(addprefix $(OBJ)/, Search.o WordIdKey.o WordInfoKey.o Compression.o DbUtils.o \
+#																		DBEnumeration.o Utils.o Stemming.o StringFileEnumeration.o \
+#                                    TestSearch.o)
+#	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/qserver: $(addprefix $(OBJ)/, QServer.o WordIdKey.o WordInfoKey.o Compression.o DbUtils.o \
+																		 DBEnumeration.o Stemming.o Utils.o StringFileEnumeration.o \
+                                     Search.o MergeUtils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/qclient: $(addprefix $(OBJ)/, QClient.o Utils.o StringFileEnumeration.o Search.o \
+																		 DBEnumeration.o Stemming.o WordIdKey.o WordInfoKey.o \
+                                     Compression.o DbUtils.o MergeUtils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/lookup: $(addprefix $(OBJ)/, Lookup.o DBIndexRead.o Utils.o DbUtils.o WordKey.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/dbdump: $(addprefix $(OBJ)/, DbDump.o DBEnumeration.o Compression.o WordKey.o \
+                                    Utils.o DbUtils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/iddump: $(addprefix $(OBJ)/, DbIdDump.o DBEnumeration.o Compression.o WordIdKey.o \
+                                    Utils.o DbUtils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/infodump: $(addprefix $(OBJ)/, DbInfoDump.o DBEnumeration.o Compression.o WordInfoKey.o \
+                                      Utils.o DbUtils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/dbindexgen: $(addprefix $(OBJ)/, DBIndexGen.o DbUtils.o WordKey.o NetworkFeeder.o SiteEnumerator.o\
+	WebCatFeeder.o FileFeeder.o repository.o FSBigFile.o TypeDetector.o FSPageContainer.o PathGenerator.o\
+	 WBHeader.o HTTPUtil.o Crc32.o \
+																				my_utility.o Utils.o Url.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/repcreator: $(addprefix $(OBJ)/, RepCreator.o NetworkFeeder.o HTML2Plain.o Utils.o repository.o FSBigFile.o\
+	 TypeDetector.o FSPageContainer.o PathGenerator.o WBHeader.o HTTPUtil.o Crc32.o WebCatFeeder.o\
+	 SiteEnumerator.o FileFeeder.o repository.o FSBigFile.o TypeDetector.o FSPageContainer.o PathGenerator.o\
+	 WBHeader.o HTTPUtil.o Crc32.o my_utility.o Url.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/statistics: $(addprefix $(OBJ)/, Statistics.o HTML2Plain.o Utils.o SiteEnumerator.o WebCatFeeder.o \
+																				NetworkFeeder.o FileFeeder.o repository.o FSBigFile.o TypeDetector.o FSPageContainer.o PathGenerator.o WBHeader.o HTTPUtil.o Crc32.o my_utility.o Url.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/timertest: $(addprefix $(OBJ)/, TimerTest.o  WordKey.o Utils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/invlistdump: $(addprefix $(OBJ)/, InvListDump.o DBEnumeration.o Compression.o WordIdKey.o \
+                                         Utils.o DbUtils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/stresswordiddb: $(addprefix $(OBJ)/, StressWordIdDB.o DBEnumeration.o Compression.o \
+                                            WordIdKey.o Utils.o DbUtils.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+$(BIN)/rewritewordiddb: $(addprefix $(OBJ)/, RewriteWordIdDB.o DBEnumeration.o Compression.o \
+																						 WordIdKey.o Utils.o DbUtils.o DBFlusher.o)
+	$(LD) $(LDFLAGS) -L text-index/db/lib -o $@ $^ -lz @PTHREAD_LIBS@ -ldb_cxx
+
+
+##
+## Experimental
+##
+
+## This section is experimental, and not used in normal builds.
+
+# Everyone should ignore this section.
+
+# Create targets for the entire file
+# TARGETS = runhandlers distributor hashlookup
+# TARGETSFILES = $(addprefix bin/,$(TARGETS))
+
+# .PHONY: all clean
+# all: $(TARGETSFILES)
+
+# $(TARGETSFILES):
+#	@echo Making $@
+# 
+# MAKEINFO = $(shell $(FIND) . -name Makefile.local)
+# SUBDIRS = $(dir $(MAKEINFO))
+
+experiment:
+	@echo $(SUBDIRS)
+	@echo $(shell $(SED) 's#[^ ]*\.o#bin/\0#g' < $(SUBDIRS)/Makefile.local)
+	@echo $(patsubst %.o:, bin/%.o:, $(patsubst %.o, bin/%.o, $(shell cat $(SUBDIRS)/Makefile.local)))
+	@echo $(shell $(SED) 's#(.*):.*$#\1#' < $(SUBDIRS)/Makefile.local)
+
+# $(OBJ)/%.o: $(DIR)/%.cc=NL=\
+#	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS)=NL=\
+# $(shell echo "$(OBJ)/%.o: $(DIR)/%.c")
+# $(RULES)
+
+# $(foreach DIR,$(SUBDIRS),\
+# define RULES\
+# $(OBJ)/%.o: $(DIR)/%.c\
+#	$(CC) -c $(CPPFLAGS) -I$(DIR) $(CFLAGS)\
+# endef\
+# $(RULES)\
+# )
+
+#		$(shell echo '\$(OBJ)/%.o: $(DIR)/%.cc' >> $@)\
+#		$(shell echo '	\$(CXX) -c \$(CPPFLAGS) -I$(DIR) \$(CXXFLAGS)' >> $@)\
+
+test2:
+	@echo $(RULES)
+	@echo $(INDEXUTILS)
+

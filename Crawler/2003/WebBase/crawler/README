@@ -1,0 +1,97 @@
+
+WebBase Web crawler
+Junghoo Cho, Pranav Kantawala
+This file last updated 9 Aug 2002, Wang Lam <wlam@cs.stanford.edu>.
+
+This file describes how the crawler is folded into WebBase.
+
+Notes to users
+--------------
+The crawler calls itself "Pita", and declares that it runs on behalf
+of "webmaster@pita.stanford.edu".  These are specified in the HTTP/1.0 request
+headers sent in crawler/crawl_server/fetch.cc:345.  The HTTP spec says that
+robots (such as this one) should use their From: header to identify the user
+who is running the robot.  The From: line should be a machine readable email
+address (RFC 822/RFC 1123 compliant).
+
+As a courtesy to Web servers that don't log From: headers, the email address
+is also duplicated as a comment in the User-agent: header line.  The comment 
+(the email address) must be surrounded by parentheses '(' and ')' to conform
+to HTTP spec.
+
+Documentation about the crawler and its operation is in crawl_binaries/README.
+"Instructions to compile and build the crawler binaries" should be skipped; 
+use WebBase/Makefile instead to generate them (approximately) as instructed 
+(cd WebBase/ && make crawler).  As noted in crawl_binaries/README, some
+warning messages may show up, but can be ignored.
+
+The crawler was ported to Red Hat Linux 7.2 (Berkeley DB 3.2), but will now 
+also compile on Red Hat Linux 7.0 (Berkeley DB 3.1).  Red Hat Linux 6.1
+does not have Berkeley DB 3, so builds on that version will fail.
+
+Please build the entire crawler using only one version of g++ (for example,
+by not interrupting the build or switching versions of Red Hat Linux halfway).
+Unlike the rest of WebBase, mixing incompatible object-file formats here may 
+cause link failures for code in this directory.
+
+# Please do not create blank lines in crawler/crawl_binaries/crawl_config.
+# Both crawler/*_server/parameter.cc seem to think of them as EOF markers.
+This issue may now be fixed.
+
+Directories
+-----------
+The crawler is imported into the WebBase source tree as follows (relative
+to WebBase root):
+
+crawler/README
+	this file
+crawler/crawl_server/
+	source code for the crawl server, which fetches Web pages 
+	from the World Wide Web
+crawler/site_server/
+	source code for the site server, which dispatches Web sites to
+	crawl servers for crawling; a Berkeley-DB-backed DNS cache;
+	and a bootstrap mechanism to start crawls
+crawler/site_server/project/
+	some external source files (/u/testbed/project/) for site_server/,
+	migrated here to make site_server/ self-contained
+crawler/crawl_binaries/
+	configuration and input for a crawl, including seed Web sites
+	to crawl; this directory doubles as an example run environment for
+	the crawler
+
+crawler/site_server is no longer used, and may be ignored.
+crawler/crawl_server/crawl_buddy.pl now takes its place.
+
+Notes to maintainers
+--------------------
+site_server/Makefile chooses Berkeley DB 3.1 or Berkeley DB 3.2 depending on 
+	the version of Red Hat Linux (7.0 or 7.2).  This run-time choice 
+	allows the code to link correctly on one more version of Red Hat Linux,
+	but the test (check /etc/redhat-release for a particular version)
+	is weak.  Versions other than the two tested above should default to 
+	Berkeley DB 3.2.
+
+WebBase/Makefile does something a bit brain-dead:  It will invoke
+	{crawl_server,site_server}/Makefile (which builds in the source
+	directory) and then copy the needed binaries into crawl_binaries/.
+	This is unlike the rest of WebBase, which is built
+	into a WebBase/obj-(version)/ and the WebBase/bin/ directory.
+
+Some source files in WebBase duplicate those in crawler/, 
+	and are compiled and linked independently.  Please check
+	to see whether changes to one source file need to be mirrored into
+	the other copy.
+
+Dependency information has been expunged from Makefiles because makedepend 
+	writes version-specific dependencies; the make depend targets have not 
+	been replaced.  While editing the crawler code's dependencies, 
+	use make depend, but remove dependency information before checking 
+	in any revised Makefiles.
+
+Do not drop project/stl (to use g++'s STL); this may expose some strange
+	behavior.  (For example, SiteServer::process_command tries to clone
+	string msg into char* str, but g++'s string->string copy constructor
+	does not necessarily allocate a new buffer, so modifications to
+	str also clobber msg.)
+

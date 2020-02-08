@@ -1,0 +1,5 @@
+cgi scripts and php scripts for webbase access can go here
+
+php scripts require php4+, which means php 4.1.2 and up, to avoid a php
+security issue.
+

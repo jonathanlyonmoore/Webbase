@@ -1,0 +1,119 @@
+/*
+   The Stanford WebBase Project <webbase@db.stanford.edu>
+   Copyright (C) 1999-2003 The Board of Trustees of the
+   Leland Stanford Junior University
+   
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; either version 2
+   of the License, or (at your option) any later version.
+   
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+   
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+*/
+#ifndef CONFIG_H
+#define CONFIG_H
+
+/* We don't use most of these defines, and simply assume them to exist.
+   (autoconf generates them for us.)
+   They should be checked or worked around if possible, though.
+   Ones that are not possible to check or work around should be removed
+   from this list in config.h.in.
+*/
+#undef HAVE_LIBWWWUTILS
+#undef HAVE_LIBWWWCORE
+#undef HAVE_LIBZ
+#undef STDC_HEADERS
+#undef HAVE_FCNTL_H
+#undef HAVE_LIMITS_H
+#undef HAVE_STRINGS_H
+#undef HAVE_SYS_TIME_H
+#undef HAVE_UNISTD_H
+#undef TIME_WITH_SYS_TIME
+#undef HAVE_GETPAGESIZE
+#undef HAVE_MMAP
+#define RETSIGTYPE (void)
+#undef HAVE_VPRINTF
+#undef HAVE_GETHOSTNAME
+#undef HAVE_GETTIMEOFDAY
+#undef HAVE_MKTIME
+#undef HAVE_SELECT
+#undef HAVE_STRCSPN
+#undef HAVE_STRDUP
+#undef HAVE_STRERROR
+#undef HAVE_STRSTR
+#undef HAVE_PTHREAD_CREATE
+#undef HAVE_SOCKET
+#undef HAVE_CONNECT
+#undef HAVE_GETHOSTBYNAME
+
+/* We actually use these. */
+#define GETHOSTBYNAME_R_ARGS 0
+#undef HAVE_DAEMON
+#undef HAVE_GETOPT_LONG
+#undef HAVE_GETOPT_LONG_ONLY
+
+/* Now, some local constants and typedefs. */
+#include <stdint.h>
+
+/* C99 says that C++ must request these defines explicitly, which seems
+   to defeat the recommendation to use them as tests for their corresponding
+   data types...
+#ifndef UINT64_MAX
+#error uint64_t is required for this code.
+#endif
+
+#ifndef INT64_MAX
+#error int64_t is required for this code.
+#endif
+*/
+
+#ifdef __cplusplus
+/* Horrible ugly hack, but nobody seems to have time to do namespaces right. */
+using namespace std;
+
+/* Another horrible ugly hack, because hash_map and hash_set are useful
+   despite their omission from ISO C++.
+
+   Rather than require all the hash-using code to recite the following
+   incantation, or making another two header files to provide indirection
+   for hash_set and hash_map, the below blurb will include hash, 
+   hash_set and hash_map into everything C++.
+ */
+#ifdef __GNUC__
+#if __GNUC__ < 3
+  #include <hash_map.h>
+  #include <hash_set.h>
+#else
+  #include <ext/hash_map>
+  #include <ext/hash_set>
+  #if __GNUC_MINOR__ != 0
+     using namespace ::__gnu_cxx;
+  #endif
+#endif
+#else /* for non-gcc compilers, guess */
+  #include <ext/hash_map>
+  #include <ext/hash_set>
+#endif
+
+extern "C" {
+#endif
+
+/** Largest-size resource (in bytes) that can be stored in repository. */
+static const uint64_t MAX_FILE_SIZE = 100 * 1024 * 1024;
+
+/** Longest URL (in bytes) that can be stored in the repository. */
+static const uint64_t MAX_URL_SIZE = 100 * 1024;
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+
