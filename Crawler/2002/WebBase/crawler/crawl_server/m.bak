@@ -1,0 +1,484 @@
+#
+# Makefile for Webbase crawler
+#
+# Author: Junghoo Cho (cho@cs.stanford.edu)
+#
+##########
+
+#
+# sources and targets
+#
+LIBRARY		= libcrawler.a
+LIBSRCS		= url.cc fetch.cc manager.cc my_utility.cc url_queue.cc \
+		  crawl_comm.cc net_mod.cc url_filter.cc \
+		  putaside_queue.cc html_parser.cc \
+		  robot_parser.cc \
+		  bigfile.cc callback.cc dnsclient.cc readmsg.cc parameter.cc
+BINSRCS		= crawl_server.cc webcat.cc 
+#		  test.cc tst4.cc \
+#		  webcast.cc
+SRCS		= ${LIBSRCS} ${BINSRCS}
+
+#
+# compiler configuration
+#
+
+OS		= linux
+#OS		= sun
+#THREADS		= yes
+
+INCS		= 
+#INCS		= -I/u/cho/project/stl/ -I/u/cho/project/library/
+#LIBS		= /u/cho/project/zlib/${OS}/libz.a
+#LIBS		= /u/cho/project/zlib/${OS}/libz.a archiver.a
+CCFLAGS		= -g -Wall ${INCS} 
+#CCFLAGS		= -g -Wall ${INCS} -DHISTORY -DNOSAVE
+#CCFLAGS		= -g -Wall ${INCS} -DJUN_ARCHIVER
+#CCFLAGS		= -g -Wall ${INCS} -DNOSAVE -DSTANFORD -DNOLOG -DHISTORY
+
+#
+# Linux
+#
+ifeq (${OS},linux)
+   CCFLAGS	+= -DLINUX
+   INCS		+= -I/u/cho/project/bind/Linux/include
+   LIBS		+= -L/u/cho/project/bind/Linux/lib -lbind -lnsl -lz
+   ifdef THREADS
+      LIBS	+= -lpthread_p
+      CCFLAGS	+= -D_REENTRANT -D_PTHREADS
+   else
+      LIBS	+= 
+      CCFLAGS	+= 
+   endif
+endif
+
+#
+# Sun
+#
+ifeq (${OS},sun)
+   CCFLAGS	+= -DSUN
+   INCS		+= -I/u/cho/project/bind/SunOS/include
+   LIBS		+= -L/u/cho/project/bind/SunOS/lib
+   ifdef THREADS
+      LIBS	+= -lbind -lsocket -lnsl -lpthread -lposix4 
+      CCFLAGS	+= -D_REENTRANT -D_PTHREADS
+   else
+      LIBS	+= -lbind -lsocket -lnsl
+      CCFLAGS	+=
+   endif
+endif
+
+#
+# purify configuration
+#
+PFLAGS		= -cache-dir=/tmp/${USER} 
+
+#
+# compilation tools
+#
+CC		= /usr/bin/g++
+AR		= ar
+RANLIB		= ranlib
+MAKEDEPEND	= makedepend
+PURIFY          = purify
+ETAGS		= etags
+TOUCH		= touch
+
+#
+# object and binary files to build
+#
+
+ifdef OS
+   ifdef THREADS
+      OBJDIR	= ${OS}/
+   else
+      OBJDIR	= ${OS}.st/
+   endif
+endif
+
+LIBOBJS		= ${LIBSRCS:%.cc=%.o}
+BINOBJS		= ${BINSRCS:%.cc=%.o}
+OBJS		= ${LIBOBJS} ${BINOBJS}
+BINS		= ${BINOBJS:%.o=%}
+BINS.PURIFY	= ${BINOBJS:%.o=%.purify}
+
+REALLIBOBJS	= ${LIBOBJS:%=${OBJDIR}%}
+REALBINOBJS	= ${BINOBJS:%=${OBJDIR}%}
+REALLIBRARY	= ${OBJDIR}${LIBRARY}
+REALOBJS	= ${REALLIBOBJS} ${REALBINOBJS}
+REALBINS	= ${BINS:%=${OBJDIR}%}
+REALBINS.PURIFY	= ${BINS.PURIFY:%=${OBJDIR}%}
+
+#
+# target dependency rules
+#
+
+all:        ${BINS} ${LIBRARY}
+all.purify: ${BINS.PURIFY} ${LIBRARY}
+library lib:    ${LIBRARY}
+
+${BINS}: %: ${OBJDIR}%
+	ln -fs $< $@
+
+${BINS.PURIFY}:	%: ${OBJDIR}%
+	ln -fs $< $@
+
+${LIBRARY}:	${REALLIBRARY}
+
+${OBJS}: %: ${OBJDIR}%
+	
+
+${REALLIBRARY}: ${REALLIBOBJS}
+		${AR} cr ${REALLIBRARY} $?
+		${RANLIB} ${REALLIBRARY}
+
+${REALOBJS}: ${OBJDIR}%.o: %.cc
+	${CC} ${CCFLAGS} -o $@ -c $<
+
+${REALBINS}: %: %.o ${REALLIBRARY}
+	${CC} ${CCFLAGS} -o $@  $< ${REALLIBRARY} ${LIBS} 
+
+${REALBINS.PURIFY}: %.purify: %.o ${REALLIBRARY}
+	${PURIFY} ${PFLAGS} ${CC} ${CCFLAGS} -o $@  $< ${REALLIBRARY} ${LIBS} 
+
+clean:
+	@echo "Removing objects..."
+	rm -f ${REALBINS} ${REALBINS.PURIFY} ${REALLIBRARY} ${REALOBJS} core 
+#	@echo "Removing purify cache files..."
+#	pure_remove_old_files . 0
+
+touch:
+	${TOUCH} ${REALLIBOBJS} ${REALLIBRARY}
+
+tags TAGS:
+	${ETAGS} ${SRCS}
+
+depend: ${SRCS}
+	${MAKEDEPEND} -p${OBJDIR} ${INCS} ${SRCS}
+
+# DO NOT DELETE
+
+linux.st/url.o: /usr/include/stdio.h /usr/include/features.h
+linux.st/url.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/url.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/url.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/url.o: /usr/include/bits/types.h /usr/include/libio.h
+linux.st/url.o: /usr/include/_G_config.h /usr/include/bits/stdio_lim.h
+linux.st/url.o: /usr/include/stdlib.h /usr/include/sys/types.h
+linux.st/url.o: /usr/include/time.h /usr/include/endian.h
+linux.st/url.o: /usr/include/bits/endian.h /usr/include/sys/select.h
+linux.st/url.o: /usr/include/bits/select.h /usr/include/bits/sigset.h
+linux.st/url.o: /usr/include/sys/sysmacros.h /usr/include/alloca.h
+linux.st/url.o: /usr/include/ctype.h url.h
+linux.st/fetch.o: /usr/include/stdio.h /usr/include/features.h
+linux.st/fetch.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/fetch.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/fetch.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/fetch.o: /usr/include/bits/types.h /usr/include/libio.h
+linux.st/fetch.o: /usr/include/_G_config.h /usr/include/bits/stdio_lim.h
+linux.st/fetch.o: /usr/include/stdlib.h /usr/include/sys/types.h
+linux.st/fetch.o: /usr/include/time.h /usr/include/endian.h
+linux.st/fetch.o: /usr/include/bits/endian.h /usr/include/sys/select.h
+linux.st/fetch.o: /usr/include/bits/select.h /usr/include/bits/sigset.h
+linux.st/fetch.o: /usr/include/sys/sysmacros.h /usr/include/alloca.h
+linux.st/fetch.o: /usr/include/strings.h /usr/include/sys/stat.h
+linux.st/fetch.o: /usr/include/bits/stat.h /usr/include/sys/socket.h
+linux.st/fetch.o: /usr/include/bits/socket.h /usr/include/bits/sockaddr.h
+linux.st/fetch.o: /usr/include/asm/socket.h /usr/include/asm/sockios.h
+linux.st/fetch.o: /usr/include/netinet/in.h /usr/include/stdint.h
+linux.st/fetch.o: /usr/include/bits/in.h /usr/include/bits/byteswap.h
+linux.st/fetch.o: /u/cho/project/bind/Linux/include/arpa/inet.h
+linux.st/fetch.o: /usr/include/sys/param.h /usr/include/limits.h
+linux.st/fetch.o: /usr/include/bits/posix1_lim.h
+linux.st/fetch.o: /usr/include/bits/local_lim.h /usr/include/linux/limits.h
+linux.st/fetch.o: /usr/include/bits/posix2_lim.h /usr/include/linux/param.h
+linux.st/fetch.o: /usr/include/asm/param.h /usr/include/sys/bitypes.h
+linux.st/fetch.o: /u/cho/project/bind/Linux/include/netdb.h
+linux.st/fetch.o: /usr/include/unistd.h /usr/include/bits/posix_opt.h
+linux.st/fetch.o: /usr/include/bits/confname.h /usr/include/getopt.h
+linux.st/fetch.o: /usr/include/fcntl.h /usr/include/bits/fcntl.h
+linux.st/fetch.o: /usr/include/assert.h /usr/include/errno.h
+linux.st/fetch.o: /usr/include/bits/errno.h /usr/include/linux/errno.h
+linux.st/fetch.o: /usr/include/asm/errno.h /usr/include/signal.h
+linux.st/fetch.o: /usr/include/bits/signum.h /usr/include/bits/siginfo.h
+linux.st/fetch.o: /usr/include/bits/sigaction.h
+linux.st/fetch.o: /usr/include/bits/sigcontext.h
+linux.st/fetch.o: /usr/include/asm/sigcontext.h /usr/include/bits/sigstack.h
+linux.st/fetch.o: /usr/include/sys/times.h fetch.h url.h net_mod.h
+linux.st/fetch.o: /usr/include/sys/time.h /usr/include/bits/time.h errors.h
+linux.st/fetch.o: my_utility.h
+linux.st/manager.o: /usr/include/sys/types.h /usr/include/features.h
+linux.st/manager.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/manager.o: /usr/include/bits/types.h
+linux.st/manager.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/manager.o: /usr/include/time.h /usr/include/endian.h
+linux.st/manager.o: /usr/include/bits/endian.h /usr/include/sys/select.h
+linux.st/manager.o: /usr/include/bits/select.h /usr/include/bits/sigset.h
+linux.st/manager.o: /usr/include/sys/sysmacros.h /usr/include/limits.h
+linux.st/manager.o: /usr/include/bits/posix1_lim.h
+linux.st/manager.o: /usr/include/bits/local_lim.h /usr/include/linux/limits.h
+linux.st/manager.o: /usr/include/bits/posix2_lim.h /usr/include/sys/times.h
+linux.st/manager.o: /usr/include/stdio.h
+linux.st/manager.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/manager.o: /usr/include/libio.h /usr/include/_G_config.h
+linux.st/manager.o: /usr/include/bits/stdio_lim.h /usr/include/zlib.h
+linux.st/manager.o: /usr/include/zconf.h /usr/include/errno.h
+linux.st/manager.o: /usr/include/bits/errno.h /usr/include/linux/errno.h
+linux.st/manager.o: /usr/include/asm/errno.h my_utility.h html_parser.h
+linux.st/manager.o: readmsg.h manager.h url_queue.h url.h url_filter.h
+linux.st/manager.o: putaside_queue.h fetch.h /usr/include/sys/socket.h
+linux.st/manager.o: /usr/include/bits/socket.h /usr/include/bits/sockaddr.h
+linux.st/manager.o: /usr/include/asm/socket.h /usr/include/asm/sockios.h
+linux.st/manager.o: net_mod.h /usr/include/sys/time.h
+linux.st/manager.o: /usr/include/bits/time.h crawl_comm.h bigfile.h
+linux.st/my_utility.o: /usr/include/stdio.h /usr/include/features.h
+linux.st/my_utility.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/my_utility.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/my_utility.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/my_utility.o: /usr/include/bits/types.h /usr/include/libio.h
+linux.st/my_utility.o: /usr/include/_G_config.h /usr/include/bits/stdio_lim.h
+linux.st/my_utility.o: my_utility.h /usr/include/sys/types.h
+linux.st/my_utility.o: /usr/include/time.h /usr/include/endian.h
+linux.st/my_utility.o: /usr/include/bits/endian.h /usr/include/sys/select.h
+linux.st/my_utility.o: /usr/include/bits/select.h /usr/include/bits/sigset.h
+linux.st/my_utility.o: /usr/include/sys/sysmacros.h
+linux.st/url_queue.o: url_queue.h url.h my_utility.h /usr/include/stdio.h
+linux.st/url_queue.o: /usr/include/features.h /usr/include/sys/cdefs.h
+linux.st/url_queue.o: /usr/include/gnu/stubs.h
+linux.st/url_queue.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/url_queue.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/url_queue.o: /usr/include/bits/types.h /usr/include/libio.h
+linux.st/url_queue.o: /usr/include/_G_config.h /usr/include/bits/stdio_lim.h
+linux.st/crawl_comm.o: /usr/include/stdlib.h /usr/include/features.h
+linux.st/crawl_comm.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/crawl_comm.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/crawl_comm.o: /usr/include/sys/types.h /usr/include/bits/types.h
+linux.st/crawl_comm.o: /usr/include/time.h /usr/include/endian.h
+linux.st/crawl_comm.o: /usr/include/bits/endian.h /usr/include/sys/select.h
+linux.st/crawl_comm.o: /usr/include/bits/select.h /usr/include/bits/sigset.h
+linux.st/crawl_comm.o: /usr/include/sys/sysmacros.h /usr/include/alloca.h
+linux.st/crawl_comm.o: /usr/include/sys/socket.h /usr/include/bits/socket.h
+linux.st/crawl_comm.o: /usr/include/bits/sockaddr.h /usr/include/asm/socket.h
+linux.st/crawl_comm.o: /usr/include/asm/sockios.h /usr/include/netinet/in.h
+linux.st/crawl_comm.o: /usr/include/stdint.h /usr/include/bits/in.h
+linux.st/crawl_comm.o: /usr/include/bits/byteswap.h
+linux.st/crawl_comm.o: /u/cho/project/bind/Linux/include/netdb.h
+linux.st/crawl_comm.o: /usr/include/sys/param.h /usr/include/limits.h
+linux.st/crawl_comm.o: /usr/include/bits/posix1_lim.h
+linux.st/crawl_comm.o: /usr/include/bits/local_lim.h
+linux.st/crawl_comm.o: /usr/include/linux/limits.h
+linux.st/crawl_comm.o: /usr/include/bits/posix2_lim.h
+linux.st/crawl_comm.o: /usr/include/linux/param.h /usr/include/asm/param.h
+linux.st/crawl_comm.o: /usr/include/sys/bitypes.h /usr/include/stdio.h
+linux.st/crawl_comm.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/crawl_comm.o: /usr/include/libio.h /usr/include/_G_config.h
+linux.st/crawl_comm.o: /usr/include/bits/stdio_lim.h /usr/include/errno.h
+linux.st/crawl_comm.o: /usr/include/bits/errno.h /usr/include/linux/errno.h
+linux.st/crawl_comm.o: /usr/include/asm/errno.h /usr/include/fcntl.h
+linux.st/crawl_comm.o: /usr/include/bits/fcntl.h /usr/include/unistd.h
+linux.st/crawl_comm.o: /usr/include/bits/posix_opt.h
+linux.st/crawl_comm.o: /usr/include/bits/confname.h /usr/include/getopt.h
+linux.st/crawl_comm.o: crawl_comm.h net_mod.h /usr/include/sys/time.h
+linux.st/crawl_comm.o: /usr/include/bits/time.h
+linux.st/net_mod.o: /usr/include/sys/types.h /usr/include/features.h
+linux.st/net_mod.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/net_mod.o: /usr/include/bits/types.h
+linux.st/net_mod.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/net_mod.o: /usr/include/time.h /usr/include/endian.h
+linux.st/net_mod.o: /usr/include/bits/endian.h /usr/include/sys/select.h
+linux.st/net_mod.o: /usr/include/bits/select.h /usr/include/bits/sigset.h
+linux.st/net_mod.o: /usr/include/sys/sysmacros.h /usr/include/unistd.h
+linux.st/net_mod.o: /usr/include/bits/posix_opt.h
+linux.st/net_mod.o: /usr/include/bits/confname.h /usr/include/getopt.h
+linux.st/net_mod.o: /usr/include/fcntl.h /usr/include/bits/fcntl.h
+linux.st/net_mod.o: /usr/include/sys/socket.h /usr/include/bits/socket.h
+linux.st/net_mod.o: /usr/include/bits/sockaddr.h /usr/include/asm/socket.h
+linux.st/net_mod.o: /usr/include/asm/sockios.h /usr/include/netinet/in.h
+linux.st/net_mod.o: /usr/include/stdint.h /usr/include/bits/in.h
+linux.st/net_mod.o: /usr/include/bits/byteswap.h
+linux.st/net_mod.o: /u/cho/project/bind/Linux/include/netdb.h
+linux.st/net_mod.o: /usr/include/sys/param.h /usr/include/limits.h
+linux.st/net_mod.o: /usr/include/bits/posix1_lim.h
+linux.st/net_mod.o: /usr/include/bits/local_lim.h /usr/include/linux/limits.h
+linux.st/net_mod.o: /usr/include/bits/posix2_lim.h /usr/include/linux/param.h
+linux.st/net_mod.o: /usr/include/asm/param.h /usr/include/sys/bitypes.h
+linux.st/net_mod.o: /usr/include/stdio.h
+linux.st/net_mod.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/net_mod.o: /usr/include/libio.h /usr/include/_G_config.h
+linux.st/net_mod.o: /usr/include/bits/stdio_lim.h /usr/include/sys/times.h
+linux.st/net_mod.o: /usr/include/errno.h /usr/include/bits/errno.h
+linux.st/net_mod.o: /usr/include/linux/errno.h /usr/include/asm/errno.h
+linux.st/net_mod.o: /usr/include/string.h /usr/include/assert.h my_utility.h
+linux.st/net_mod.o: net_mod.h /usr/include/sys/time.h
+linux.st/net_mod.o: /usr/include/bits/time.h
+linux.st/url_filter.o: my_utility.h /usr/include/stdio.h
+linux.st/url_filter.o: /usr/include/features.h /usr/include/sys/cdefs.h
+linux.st/url_filter.o: /usr/include/gnu/stubs.h
+linux.st/url_filter.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/url_filter.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/url_filter.o: /usr/include/bits/types.h /usr/include/libio.h
+linux.st/url_filter.o: /usr/include/_G_config.h /usr/include/bits/stdio_lim.h
+linux.st/url_filter.o: url_filter.h url.h
+linux.st/putaside_queue.o: /usr/include/stdio.h /usr/include/features.h
+linux.st/putaside_queue.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/putaside_queue.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/putaside_queue.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/putaside_queue.o: /usr/include/bits/types.h /usr/include/libio.h
+linux.st/putaside_queue.o: /usr/include/_G_config.h
+linux.st/putaside_queue.o: /usr/include/bits/stdio_lim.h putaside_queue.h
+linux.st/putaside_queue.o: url.h my_utility.h /usr/include/ctype.h
+linux.st/putaside_queue.o: /usr/include/endian.h /usr/include/bits/endian.h
+linux.st/html_parser.o: /usr/include/string.h /usr/include/features.h
+linux.st/html_parser.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/html_parser.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/html_parser.o: /usr/include/assert.h /usr/include/ctype.h
+linux.st/html_parser.o: /usr/include/bits/types.h /usr/include/endian.h
+linux.st/html_parser.o: /usr/include/bits/endian.h html_parser.h
+linux.st/robot_parser.o: /usr/include/string.h /usr/include/features.h
+linux.st/robot_parser.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/robot_parser.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/robot_parser.o: /usr/include/stdio.h
+linux.st/robot_parser.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/robot_parser.o: /usr/include/bits/types.h /usr/include/libio.h
+linux.st/robot_parser.o: /usr/include/_G_config.h
+linux.st/robot_parser.o: /usr/include/bits/stdio_lim.h my_utility.h
+linux.st/new_site.o: /usr/include/pthread.h /usr/include/features.h
+linux.st/new_site.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/new_site.o: /usr/include/sched.h /usr/include/bits/types.h
+linux.st/new_site.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/new_site.o: /usr/include/time.h /usr/include/bits/sched.h
+linux.st/new_site.o: /usr/include/signal.h /usr/include/bits/sigset.h
+linux.st/new_site.o: /usr/include/bits/signum.h /usr/include/bits/siginfo.h
+linux.st/new_site.o: /usr/include/bits/sigaction.h
+linux.st/new_site.o: /usr/include/bits/sigcontext.h
+linux.st/new_site.o: /usr/include/asm/sigcontext.h
+linux.st/new_site.o: /usr/include/bits/sigstack.h
+linux.st/new_site.o: /usr/include/bits/pthreadtypes.h
+linux.st/new_site.o: /usr/include/bits/sigthread.h dnshelper.h
+linux.st/bigfile.o: bigfile.h /usr/include/time.h /usr/include/bits/types.h
+linux.st/bigfile.o: /usr/include/features.h /usr/include/sys/cdefs.h
+linux.st/bigfile.o: /usr/include/gnu/stubs.h
+linux.st/bigfile.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/bigfile.o: /usr/include/stdio.h
+linux.st/bigfile.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/bigfile.o: /usr/include/libio.h /usr/include/_G_config.h
+linux.st/bigfile.o: /usr/include/bits/stdio_lim.h my_utility.h
+linux.st/bigfile.o: /usr/include/zlib.h /usr/include/zconf.h
+linux.st/bigfile.o: /usr/include/sys/types.h /usr/include/endian.h
+linux.st/bigfile.o: /usr/include/bits/endian.h /usr/include/sys/select.h
+linux.st/bigfile.o: /usr/include/bits/select.h /usr/include/bits/sigset.h
+linux.st/bigfile.o: /usr/include/sys/sysmacros.h /usr/include/netinet/in.h
+linux.st/bigfile.o: /usr/include/stdint.h /usr/include/bits/socket.h
+linux.st/bigfile.o: /usr/include/bits/sockaddr.h /usr/include/asm/socket.h
+linux.st/bigfile.o: /usr/include/asm/sockios.h /usr/include/bits/in.h
+linux.st/bigfile.o: /usr/include/bits/byteswap.h /usr/include/sys/stat.h
+linux.st/bigfile.o: /usr/include/bits/stat.h /usr/include/fcntl.h
+linux.st/bigfile.o: /usr/include/bits/fcntl.h /usr/include/unistd.h
+linux.st/bigfile.o: /usr/include/bits/posix_opt.h
+linux.st/bigfile.o: /usr/include/bits/confname.h /usr/include/getopt.h
+linux.st/bigfile.o: /usr/include/errno.h /usr/include/bits/errno.h
+linux.st/bigfile.o: /usr/include/linux/errno.h /usr/include/asm/errno.h
+linux.st/bigfile.o: /usr/include/sys/vfs.h /usr/include/sys/statfs.h
+linux.st/bigfile.o: /usr/include/bits/statfs.h
+linux.st/callback.o: /usr/include/sys/types.h /usr/include/features.h
+linux.st/callback.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/callback.o: /usr/include/bits/types.h
+linux.st/callback.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/callback.o: /usr/include/time.h /usr/include/endian.h
+linux.st/callback.o: /usr/include/bits/endian.h /usr/include/sys/select.h
+linux.st/callback.o: /usr/include/bits/select.h /usr/include/bits/sigset.h
+linux.st/callback.o: /usr/include/sys/sysmacros.h /usr/include/sys/socket.h
+linux.st/callback.o: /usr/include/bits/socket.h /usr/include/bits/sockaddr.h
+linux.st/callback.o: /usr/include/asm/socket.h /usr/include/asm/sockios.h
+linux.st/callback.o: /usr/include/netinet/in.h /usr/include/stdint.h
+linux.st/callback.o: /usr/include/bits/in.h /usr/include/bits/byteswap.h
+linux.st/callback.o: /u/cho/project/bind/Linux/include/arpa/inet.h
+linux.st/callback.o: /usr/include/sys/param.h /usr/include/limits.h
+linux.st/callback.o: /usr/include/bits/posix1_lim.h
+linux.st/callback.o: /usr/include/bits/local_lim.h
+linux.st/callback.o: /usr/include/linux/limits.h
+linux.st/callback.o: /usr/include/bits/posix2_lim.h
+linux.st/callback.o: /usr/include/linux/param.h /usr/include/asm/param.h
+linux.st/callback.o: /usr/include/sys/bitypes.h /usr/include/sys/times.h
+linux.st/callback.o: /usr/include/stdio.h
+linux.st/callback.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/callback.o: /usr/include/libio.h /usr/include/_G_config.h
+linux.st/callback.o: /usr/include/bits/stdio_lim.h /usr/include/zlib.h
+linux.st/callback.o: /usr/include/zconf.h manager.h url_queue.h url.h
+linux.st/callback.o: url_filter.h putaside_queue.h fetch.h net_mod.h
+linux.st/callback.o: /usr/include/sys/time.h /usr/include/bits/time.h
+linux.st/callback.o: crawl_comm.h bigfile.h my_utility.h html_parser.h
+linux.st/callback.o: robot_parser.h
+linux.st/dnsclient.o: /usr/include/stdio.h /usr/include/features.h
+linux.st/dnsclient.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/dnsclient.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/dnsclient.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/dnsclient.o: /usr/include/bits/types.h /usr/include/libio.h
+linux.st/dnsclient.o: /usr/include/_G_config.h /usr/include/bits/stdio_lim.h
+linux.st/dnsclient.o: /usr/include/sys/types.h /usr/include/time.h
+linux.st/dnsclient.o: /usr/include/endian.h /usr/include/bits/endian.h
+linux.st/dnsclient.o: /usr/include/sys/select.h /usr/include/bits/select.h
+linux.st/dnsclient.o: /usr/include/bits/sigset.h /usr/include/sys/sysmacros.h
+linux.st/dnsclient.o: /usr/include/sys/socket.h /usr/include/bits/socket.h
+linux.st/dnsclient.o: /usr/include/bits/sockaddr.h /usr/include/asm/socket.h
+linux.st/dnsclient.o: /usr/include/asm/sockios.h /usr/include/netinet/in.h
+linux.st/dnsclient.o: /usr/include/stdint.h /usr/include/bits/in.h
+linux.st/dnsclient.o: /usr/include/bits/byteswap.h
+linux.st/dnsclient.o: /u/cho/project/bind/Linux/include/arpa/inet.h
+linux.st/dnsclient.o: /usr/include/sys/param.h /usr/include/limits.h
+linux.st/dnsclient.o: /usr/include/bits/posix1_lim.h
+linux.st/dnsclient.o: /usr/include/bits/local_lim.h
+linux.st/dnsclient.o: /usr/include/linux/limits.h
+linux.st/dnsclient.o: /usr/include/bits/posix2_lim.h
+linux.st/dnsclient.o: /usr/include/linux/param.h /usr/include/asm/param.h
+linux.st/dnsclient.o: /usr/include/sys/bitypes.h
+linux.st/dnsclient.o: /u/cho/project/bind/Linux/include/netdb.h
+linux.st/dnsclient.o: /usr/include/unistd.h /usr/include/bits/posix_opt.h
+linux.st/dnsclient.o: /usr/include/bits/confname.h /usr/include/getopt.h
+linux.st/readmsg.o: /usr/include/ctype.h /usr/include/features.h
+linux.st/readmsg.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/readmsg.o: /usr/include/bits/types.h
+linux.st/readmsg.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/readmsg.o: /usr/include/endian.h /usr/include/bits/endian.h
+linux.st/readmsg.o: mygetline.h trim.h readmsg.h
+linux.st/parameter.o: /usr/include/getopt.h /usr/include/stdio.h
+linux.st/parameter.o: /usr/include/features.h /usr/include/sys/cdefs.h
+linux.st/parameter.o: /usr/include/gnu/stubs.h
+linux.st/parameter.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/parameter.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/parameter.o: /usr/include/bits/types.h /usr/include/libio.h
+linux.st/parameter.o: /usr/include/_G_config.h /usr/include/bits/stdio_lim.h
+linux.st/parameter.o: parameter.h my_utility.h
+linux.st/crawl_server.o: /usr/include/stdlib.h /usr/include/features.h
+linux.st/crawl_server.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/crawl_server.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/crawl_server.o: /usr/include/sys/types.h /usr/include/bits/types.h
+linux.st/crawl_server.o: /usr/include/time.h /usr/include/endian.h
+linux.st/crawl_server.o: /usr/include/bits/endian.h /usr/include/sys/select.h
+linux.st/crawl_server.o: /usr/include/bits/select.h
+linux.st/crawl_server.o: /usr/include/bits/sigset.h
+linux.st/crawl_server.o: /usr/include/sys/sysmacros.h /usr/include/alloca.h
+linux.st/crawl_server.o: /usr/include/stdio.h
+linux.st/crawl_server.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/crawl_server.o: /usr/include/libio.h /usr/include/_G_config.h
+linux.st/crawl_server.o: /usr/include/bits/stdio_lim.h
+linux.st/crawl_server.o: /usr/include/netinet/in.h /usr/include/stdint.h
+linux.st/crawl_server.o: /usr/include/bits/socket.h
+linux.st/crawl_server.o: /usr/include/bits/sockaddr.h
+linux.st/crawl_server.o: /usr/include/asm/socket.h /usr/include/asm/sockios.h
+linux.st/crawl_server.o: /usr/include/bits/in.h /usr/include/bits/byteswap.h
+linux.st/crawl_server.o: manager.h url_queue.h url.h url_filter.h
+linux.st/crawl_server.o: putaside_queue.h fetch.h /usr/include/sys/socket.h
+linux.st/crawl_server.o: net_mod.h /usr/include/sys/time.h
+linux.st/crawl_server.o: /usr/include/bits/time.h crawl_comm.h bigfile.h
+linux.st/crawl_server.o: my_utility.h parameter.h
+linux.st/webcat.o: /usr/include/stdio.h /usr/include/features.h
+linux.st/webcat.o: /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h
+linux.st/webcat.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stddef.h
+linux.st/webcat.o: /usr/lib/gcc-lib/i386-redhat-linux/egcs-2.91.66/include/stdarg.h
+linux.st/webcat.o: /usr/include/bits/types.h /usr/include/libio.h
+linux.st/webcat.o: /usr/include/_G_config.h /usr/include/bits/stdio_lim.h
+linux.st/webcat.o: /usr/include/unistd.h /usr/include/bits/posix_opt.h
+linux.st/webcat.o: /usr/include/bits/confname.h /usr/include/getopt.h
+linux.st/webcat.o: bigfile.h /usr/include/time.h my_utility.h html_parser.h
+linux.st/webcat.o: url.h

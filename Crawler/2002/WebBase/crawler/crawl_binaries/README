@@ -1,0 +1,139 @@
+CRAWLER DOCUMENTATION
+=====================
+
+01/27/2002	Created		Pranav Kantawala (pranavk@cs.stanford.edu)
+01/31/2002	Inserts		Wang Lam (wlam@cs.stanford.edu)
+		added crawler skip list, crawler explanation message
+
+====================
+
+Description of modules
+----------------------
+1. Siteserver
+	This module controls the activities of the crawler.  The module performs the following operations, in that order:
+
+  * reads site-names from a text file, 
+  * requests the dnsdbserver to resolve the name into its IP address,
+  * provides the IP address to one of the crawler instances for crawling.
+
+	The Siteserver maintains a queue for each crawler instance, and balances the load on each crawler.
+
+2. Dnsdbserver
+	This module resolves site-names (hostname) into IP addresses.  It takes as an input a hostname, and uses the adns library for asynchronous resolution into IP address.  It stores the <hostname, IP addresses> mapping into a database (we use BerkeleyDB) for faster lookup if the same hostname/IP address is encountered again.  It provides a list of IP addresses corresponding to a hostname to the calling function.
+
+3. Crawlserver
+	This module performs the actual task of crawling a website.  It receives an IP address (corresponding to a website) from the Siteserver and crawls the pages in that website.  The crawled pages are compressed and stored in repositories.
+
+4. Starter
+	This module performs the bootstrap process.  Depending on the configuration in the crawl_config file, it sends a bunch of requests to the siteserver to get the crawling process started.
+
+Instructions to compile and build the crawler binaries
+------------------------------------------------------
+1. Unzip and untar the file crawl_server.tar.gz in a directory.  Run 'make' without any parameters.  The 'crawl_server' binary will be created under linux.st subdirectory.
+
+2. Unzip and untar the file site_server.tar.gz in a separate directory.  Run 'make siteserver', 'make dnsdbserver', 'make starter'.  The binaries will be created in the same directory.
+
+Note:  While building siteserver, a few warning messages are seen.  Ignore them.
+
+Instructions to run the crawler
+-------------------------------
+1. Ensure that the following binaries are available:
+   * siteserver
+   * dnsdbserver
+   * crawl_server
+   * starter
+
+2. Configure the crawler parameters in crawl_config file.  Comments in the file are self-explanatory.  It is important to keep the number of crawler addresses (LocalAddress), and count of crawler (Crawlers) in sync.
+
+2a. The following sites complained in the past about being crawled, and can
+be removed from site list sitenames:
+	www.u3aonline.org.au
+	u3aonline.edna.edu.au
+	www.insidechina.com
+	www.zreclaim.com
+
+The CVS version of sitenames should already omit them.
+
+3. Create dir.config.N files if you have N crawlers.  Value of N ranges from 0 to N-1.  In each file, store the location where crawled data should be stored.  Make sure that these locations exist, and are accessible.
+
+4. Create a 'log' directory under the main directory, if it does not exist.
+
+5. Ensure that a file containing list of sites to be crawled exists.
+
+6. Run the following commands, in that order, each in a different window (for the sake of clarity):
+   $ ./siteserver
+   $ ./dnsdbserver
+   $ ./crawl_server -id 0
+   $ ./crawl_server -id 1
+   $ ./crawl_server -id 2
+   $ ...
+   $ ..
+   $ .
+   $ ./starter
+
+   (there should be N crawl_server instances corresponding to N crawlers)
+
+
+After the crawl has already started...
+--------------------------------------
+1. If you want to run more crawlers:
+   * Modify the entries in crawl_config (LocalAddress, and Crawlers) to reflect the change,
+   * Create additional dir.config.N file(s),
+   * In a new window, execute 'crawl_server -id <crawler_id>, for each new crawler.
+
+2. If you want to stop a crawler, kill the process corresponding to that crawler.
+
+3. If, for some reason, any crawler instance crashes/hangs, run the process again.
+
+4. If the dnsdbserver crashes, run the process again.
+
+5. If the siteserver crashes, all processes need to be stopped.  It is possible that first n sites from the list of sites have already been crawled.  From the site/crawler logs, it is possible to estimate the n.  Remove the first n entries from the file that stores this list of sites, and run the binaries as mentioned above.
+
+Note: The starter process terminates normally after the bootstrap process is over.
+
+Monitoring the crawler
+----------------------
+	The modules create log files to monitor the crawler activities.
+
+1. Siteserver creates site.log.nnn, where nnn is a counter starting from 000.  These files log the activities of siteserver.
+
+2. Dnsdbserver creates log file specified in crawl_config file.  It logs the DNS resolution activities.
+
+3. Crawlserver creates log files under 'log' directory.  They are stored in the format: crawl_server.n.mmm, where n is the crawler instance ID, and mmm is a counter starting from 000.  They log details of each page that is crawled.
+
+	If any website owner sends a query, these logs can be consulted to find out the details about when and what was crawled from that website. 
+
+Below is a template crawler-inquiry message:
+
+---------- Forwarded message ----------
+Date: Fri, 5 Jan 2001 12:01:17 -0800 (PST)
+From: Junghoo Cho <cho@cs.stanford.edu>
+To: pranavk@db.Stanford.EDU
+Cc: andyk@db.Stanford.EDU
+Subject: crawl complaint template file
+
+Dear Webmaster,
+
+My name is Junghoo Cho and I am a Ph.D student in Stanford
+University. I got your complaint about our crawling activity
+and started investigating our access log.
+The name of my crawler/spider is "pita" and it will run on
+"pita.stanford.edu."
+
+We periodically crawl the Web to collect a fresh set of pages.
+During the crawl, we minimize the load on one site,
+by pausing for 10 seconds between requests and by downloading
+a limited number of pages from one site.
+For most sites, this does not cause any problem, but
+if you do not want any crawler to access your site at all,
+you can do so by updating your robots.txt file.
+"http://info.webcrawler.com/mak/projects/robots/exclusion.html"
+
+This crawling is performed as a part of Stanford digital
+library project. In our project, we study how the Web is
+organized and evolves over time, and we also study various
+mining techniques to extract interesting data from the web.
+
+Thank you.
+
+

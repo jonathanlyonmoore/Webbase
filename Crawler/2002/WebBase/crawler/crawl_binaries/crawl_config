@@ -1,0 +1,67 @@
+### Configuration parameters for siteserver module
+[siteserver]
+
+#hostname:port of siteserver
+LocalAddress=localhost:20003,localhost:20004,localhost:20005
+
+#log file that stores log of siteserver
+LogFile=site.log
+
+#file that stores names of sites to be crawled
+SiteFile=sitenames
+
+#Maximum number of pages to be downloaded from a site
+MaxPage=3000
+
+#Maximum link-depth at which to crawl in a site
+MaxLinkDepth=10
+
+#Interval in milli-seconds between crawler's consecutive requests to a site
+RequestInterval=10000
+
+
+### Configuration parameters for crawlserver module
+[crawlserver]
+
+#hostname:port of crawlers.  There can be multiple crawlers.
+#All entries should be separated by a comma
+LocalAddress=localhost:20103,localhost:20104,localhost:20105
+
+#file that stores location of repository
+#dir.config.N refers to Nth crawler
+#there should be N such files if N crawlers are running
+#numbering starts at 0 and ends at N-1
+ConfigFile=dir.config
+
+# Extensions which are followed
+ExtParse=htm,html,shtm,shtml,php,phtml,asp,no_ext
+
+# Extensions which are stored (add mp3,gif,jpg,png ?)
+ExtStore=htm,html,shtm,shtml,php,phtml,asp,txt,text,no_ext
+
+# Set this to 1 to enable fetching the targets of <IMG> tags
+#FollowIMG=1
+
+
+### Configuration parameters for dnsdbserver module
+[dnsdbserver]
+
+#hostname:port of dnsdbserver
+DnsAddress=pita:20100
+
+#log file that stores log of dnsdbserver
+LogFile=dnsdb.log
+
+#name of the Database that stores <sitename, IP address> mappings
+#e.g. names will be dnsdb.name and dnsdb.ip
+DbName=dnsdb
+
+### Configuration parameters for starter module
+[starter]
+
+#Number of crawlers to be run
+Crawlers=3
+
+#Number of requests to send to each site during crawler bootstrap process
+Threads=200
+

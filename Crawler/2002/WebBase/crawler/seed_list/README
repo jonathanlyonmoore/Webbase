@@ -1,0 +1,12 @@
+order:
+
+extract-hosts.pl
+resolve.pl
+merge-aliases.pl
+prune-aliases.pl
+load-aliases.pl # change db info
+
+# '9' in tail -9 is to extract all but the first line
+cat input | perl extract-hosts.pl | tail -9 | perl resolve.pl | perl merge-aliases.pl | perl prune-aliases.pl > table.sql
+cat table.sql | perl load-aliases.pl (appropriately edited)
+

@@ -1,0 +1,63 @@
+
+TODO list for crawler
+---------------------
+* active item
+x no longer applies; "done" because siteserver/dnsdbserver replaced
+- done
+
+x siteserver is peppered with exit(1) statements (effectively, abort) 
+  in response to network failures.  If dnsdbserver or a crawl_server is 
+  not listen(2)ing when siteserver tries to talk to it, siteserver will die.
+
+x dnsdbserver may have a memory leak, causing it to segfault after some time.
+
+* crawl_server does not suggest new sites to siteserver to crawl;
+  building a new sitenames (domain-names-to-crawl) list requires scanning
+  the old repository.
+
+x siteserver does not save its state; if siteserver restarts, it goes through
+  the sitenames list anew.  siteserver also does not edit (append to) 
+  the sitenames list.
+
+* siteserver does not implement a deny list (domain names never to crawl).
+  To omit domain names, sitenames must be edited.
+
+* crawl_server does not implement (the rarely-implemented) META-tag
+  NOINDEX,NOFOLLOW robots exclusion in HTML files it sees.
+  (crawl_server does implement robots.txt robot exclusion, as 
+  user-agent "Pita".  This is slightly different from how it identifies
+  itself currently, "Pita (email-address)" where an email-address is 
+  hard-coded at compile-time.)
+
+* crawl_server does not recognize comments, and continues to parse for links
+  inside them.
+
+* crawl_server does not check whether URLs it sees are valid URIs (RFC 2396).
+  In particular, it may allow \r or \n into URLs written into the repository,
+  which may freak out programs expecting URLs to be one line.
+
+* crawl_config cannot change substantially after siteserver is loaded.
+  siteserver cannot reread crawl_config on demand.  siteserver's
+  data structures are fixed (in size) when siteserver starts up.
+
+* crawl_server has a compiled MAX_NUM_QUEUES that limits the number of Web
+  sites crawl_server can crawl concurrently.  This constant cannot be
+  exceeded, even if any configuration files request otherwise.
+
+- crawl_server PAUSE may be "leaky:"  If a CRAWL (new site) command arrives
+  after a PAUSE, crawl_server will crawl anyway.  A subsequent PAUSE command
+  will pause any new sites without losing any old ones, but in the meanwhile, 
+  crawl_server can be induced into accumulating more sites to crawl
+  concurrently than crawl_server/manager.h:MAX_NUM_QUEUES or
+  crawl_config:[starter]:Threads allow.  In this case, Threads would be ignored
+  but crawl_server RESUME will drop any sites over MAX_NUM_QUEUES.
+
+* crawl_server can have several pages queued for a Web site, simultaneously.
+  The first is /robots.txt, and the second is /, but new pages may then be
+  added to the queue before robots.txt is returned and processed.
+
+* crawl_server tries only once to send its Web-site-completed message to its
+  siteserver (or crawl_buddy.pl).  If the send fails, e.g. because the Linux
+  TCP/IP stack drops packets over localhost (!), the message is permanently
+  lost.
+

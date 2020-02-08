@@ -1,0 +1,122 @@
+/*
+   The Stanford WebBase Project <webbase@db.stanford.edu>
+   Copyright (C) 1999-2002 The Board of Trustees of the
+   Leland Stanford Junior University
+   
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License
+   as published by the Free Software Foundation; either version 2
+   of the License, or (at your option) any later version.
+   
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+   
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+*/
+
+Quickstart:
+
+Build everything:
+(Use a Linux box)
+
+Make sure the library path includes W3C's libwww, available at
+http://www.w3.org/Library/
+In particular, this code needs files libwwwcore.* and libwwwutils.*.
+
+Make sure environment variable WEBBASE points to WebBase:
+setenv WEBBASE xxx/WebBase
+
+(1) Run GNU make:
+	WebBase/> make client
+
+(2) Test your build.
+	(a) Turn on cat-handler, which simply outputs what it receives.
+		In inputs/webbase.conf, set
+		CAT_ON = 1
+	(b) Try RunHandlers on a local example file:
+		bin/RunHandlers "file://handlers/example-50-pages"
+	[50 sample pages are printed]
+
+
+Now try the network version:
+
+
+Method 1:
+ Run scripts/distribrequestor.pl to start a distributor on our server:
+ (either chmod +x scripts/distribrequestor.pl or invoke it with "perl")
+
+ WebBase/> scripts/distribrequestor.pl 0  [starts at offset 0]
+ client got back:  171.64.75.93:9007 
+ WebBase/>
+
+ Save the port # and ip address: you'll need it.
+
+ Now you can invoke RunHandlers with the above info:
+
+ WebBase/> bin/RunHandlers "net://171.64.75.93:9007/?numPages=100"
+
+ will print back 100 sample pages.  All instances of RunHandlers connected to
+ the above port will share the same pool of pages.  To get an independent
+ stream, rerun distribrequestor.pl to get a new port.
+
+
+Method 2:
+ You can also use our one-step script getPages.pl with no args,
+ it will prompt you for the offset and num pages and invoke
+ RunHandlers for you.
+
+
+As a rule of thumb, run at most 5 RunHandlers processes to conserve
+server/network resources.
+
+
+-------------------------------------------------------------------
+
+
+To create a new handler:
+
+You can use the other handlers in the distribution as templates.
+To add a new handler, add the following to the appropriate places:
+ * 1) #include "myhandler.h" into handlers/all_handlers.h
+ * 2) handler.push_back(new MyHandler()); into handlers/all_handlers.h
+      (following the template of the handlers already there)
+ * 3) in Makefile, add entries for your segments to compile
+      in the line: HANDLER_OBJS = jhandler.o [...]
+ *opt)in Makefile, customize your build if necessary by adding a line
+	jhandler_CXXFLAGS = -Iyour-include-dir --your-switches [...]
+      (following the template of the handlers already there)
+
+We also have a one-button script called scripts/addHandler.pl that will 
+prompt you for all your pieces and put them in place, without you having
+to do the above file surgery yourself.
+
+
+-----------------------------------------------------------------
+
+GLOSSARY
+
+RunHandlers - (formerly "process") an executable that indexes a stream, 
+              file or repository.
+              Made up basically of a feeder and one or more handlers.
+
+handler - the interface that any index-building piece of code must implement.
+          The interface's main (only) method will provide a page and associated
+          metadata and the implementor of the method can do whatever he wants
+          with it.
+
+feeder -  the interface for receiving a page stream from any kind of source
+          (directly from the repository, via Webcat, via network, etc.). The
+          key method of the interface is "next" which advances the stream by one
+          page. After calling next, various other methods can be used to get the
+          associated metadata for the current page in the stream. Can also be used
+          to build indexes if the index-building code is written to process page
+          streams
+
+distributor - a program that disseminates pages to multiple clients
+              over the network, supporting session ID's, etc. 
+	      A generalization of what Distributor.cc in text-index/ does.
+
